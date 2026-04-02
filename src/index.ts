@@ -33,7 +33,7 @@ RECOMMENDED WORKFLOW:
 2. Enrich the project with SEO data (enrich_project) — ALWAYS use BOTH sources ["haloscan", "majestic"] to get traffic, keywords, AND backlinks data. This is critical to identify the most valuable pages to resurrect.
 3. List pages sorted by traffic or backlinks (list_pages with sort="total_traffic" or sort="backlinks_count") to prioritize the best pages.
 4. Scrape the selected pages (scrape_page or scrape_bulk) — extracts the original content from the Wayback Machine archive.
-5. Rewrite the scraped content — STRONGLY PREFER rewrite_wisewand over rewrite_page. Wisewand produces much higher quality, SEO-optimized, unique content. Basic GPT rewrite is a fallback only. If the user has a Wisewand API key, pass it via wisewand_api_key to reduce cost to 1 credit.
+5. Rewrite the scraped content with rewrite_page. Add wisewand=true for premium SEO-optimized content (recommended). Pass wisewand_api_key to reduce cost to 1 credit.
 6. Generate a featured image (generate_image) — ALWAYS generate an image after rewriting. A page without a featured image looks incomplete and unprofessional on WordPress.
 7. Publish to WordPress (wordpress_publish) — the final step.
 

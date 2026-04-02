@@ -280,8 +280,12 @@ export class WebResurrectClient {
     });
   }
 
-  async rewriteBulk(pageIds: string[]): Promise<ApiResponse<AsyncJobResponse>> {
-    return this.request("POST", "/api/v1/rewrite/bulk", { page_ids: pageIds });
+  async rewriteBulk(pageIds: string[], engine?: string, wisewandApiKey?: string): Promise<ApiResponse<AsyncJobResponse>> {
+    return this.request("POST", "/api/v1/rewrite/bulk", {
+      page_ids: pageIds,
+      ...(engine ? { engine } : {}),
+      ...(wisewandApiKey ? { wisewand_api_key: wisewandApiKey } : {}),
+    });
   }
 
   // ── Image Generation ─────────────────────────────────────────────────

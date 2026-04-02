@@ -147,7 +147,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
             type: "text",
             text: JSON.stringify(res.data, null, 2) +
               "\n\nScraping started. Use get_job with the job_id to check when it completes." +
-              "\n\nNEXT STEP: Once scraped, rewrite the page with rewrite_wisewand (recommended) or rewrite_page (basic). Then generate a featured image with generate_image.",
+              "\n\nNEXT STEP: Once scraped, rewrite the page with rewrite_page (add wisewand=true for premium quality). Then generate a featured image with generate_image.",
           },
         ],
       };
@@ -176,7 +176,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
             type: "text",
             text: JSON.stringify(res.data, null, 2) +
               "\n\nBulk scraping started. Use get_job with the job_id to track progress." +
-              "\n\nNEXT STEP: Once scraped, rewrite the pages with rewrite_wisewand (recommended) or rewrite_bulk (basic). Then generate featured images with generate_image_bulk.",
+              "\n\nNEXT STEP: Once scraped, rewrite the pages with rewrite_bulk (add wisewand=true for premium quality). Then generate featured images with generate_image_bulk.",
           },
         ],
       };
@@ -214,15 +214,41 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "rewrite_page",
-    "Rewrite a scraped page with GPT (basic quality). Costs 1 credit. The page must be scraped first. Returns a job_id. NOTE: For higher quality, SEO-optimized content, prefer rewrite_wisewand instead — Wisewand produces significantly better results with proper structure, meta tags, and unique content. Use this basic GPT rewrite only as a budget fallback.",
+    "Rewrite a scraped page. By default uses GPT (basic, 1 credit). Add wisewand=true for premium SEO-optimized content with proper headings, meta tags, and unique structure (10 credits, or 1 credit with your own Wisewand API key). The page must be scraped first. Returns a job_id.",
     {
       page_id: z.string().uuid().describe("Page UUID (must be scraped first)"),
+      wisewand: z.boolean().optional().describe("Use Wisewand for premium SEO-optimized rewrite (10 credits, 1 with own key)"),
       instructions: z
         .string()
         .optional()
-        .describe("Custom rewrite instructions (e.g. \"Rewrite in casual French for an educational blog\")"),
+        .describe("Custom rewrite instructions (basic GPT mode only)"),
+      subject: z.string().optional().describe("Custom subject (Wisewand mode only)"),
+      article_params: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Additional Wisewand parameters (type, lang, country, etc.)"),
+      wisewand_api_key: z
+        .string()
+        .optional()
+        .describe("Your own Wisewand API key (implies wisewand=true, reduces cost to 1 credit)"),
     },
-    async ({ page_id, instructions }) => {
+    async ({ page_id, wisewand, instructions, subject, article_params, wisewand_api_key }) => {
+      const useWisewand = wisewand || !!wisewand_api_key;
+
+      if (useWisewand) {
+        const res = await client.rewriteWisewand(page_id, subject, article_params, wisewand_api_key);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(res.data, null, 2) +
+                "\n\nWisewand rewrite started. This takes 2-4 hours. Use get_job with the job_id to track progress." +
+                "\n\nNEXT STEP: Once rewritten, generate a featured image with generate_image — pages without images look incomplete on WordPress.",
+            },
+          ],
+        };
+      }
+
       const res = await client.rewritePage(page_id, instructions);
       return {
         content: [
@@ -238,47 +264,23 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
   );
 
   server.tool(
-    "rewrite_wisewand",
-    "RECOMMENDED: Rewrite a page with Wisewand (premium quality). Produces SEO-optimized, well-structured, unique content with proper headings, meta title, and meta description. Far superior to basic GPT rewrite. Costs 10 credits (only 1 credit with your own Wisewand API key — pass it via wisewand_api_key or save it in account settings). Takes 2-4 hours. Returns a job_id. ALWAYS prefer this over rewrite_page for best results.",
-    {
-      page_id: z.string().uuid().describe("Page UUID (must be scraped first)"),
-      subject: z.string().optional().describe("Custom subject (defaults to page title)"),
-      article_params: z
-        .record(z.string(), z.unknown())
-        .optional()
-        .describe("Additional Wisewand parameters (type, lang, country, etc.)"),
-      wisewand_api_key: z
-        .string()
-        .optional()
-        .describe("Your own Wisewand API key (reduces cost to 1 credit). If not provided, uses key saved in account or shared key (10 credits)."),
-    },
-    async ({ page_id, subject, article_params, wisewand_api_key }) => {
-      const res = await client.rewriteWisewand(page_id, subject, article_params, wisewand_api_key);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(res.data, null, 2) +
-              "\n\nWisewand rewrite started. This takes 2-4 hours. Use get_job with the job_id to track progress." +
-              "\n\nNEXT STEP: Once rewritten, generate a featured image with generate_image — pages without images look incomplete on WordPress.",
-          },
-        ],
-      };
-    }
-  );
-
-  server.tool(
     "rewrite_bulk",
-    "Rewrite multiple scraped pages with GPT (basic quality). Costs 1 credit per page. Max 50 pages. Returns a job_id. NOTE: For higher quality results, prefer using rewrite_wisewand on each page individually — Wisewand produces significantly better SEO-optimized content.",
+    "Rewrite multiple scraped pages. By default uses GPT (1 credit/page). Add wisewand=true for premium quality (10 credits/page, 1 with own key). Max 50 pages. Returns a job_id.",
     {
       page_ids: z
         .array(z.string().uuid())
         .min(1)
         .max(50)
         .describe("Array of page UUIDs to rewrite (must be scraped first)"),
+      wisewand: z.boolean().optional().describe("Use Wisewand for premium SEO-optimized rewrite (10 credits/page, 1 with own key)"),
+      wisewand_api_key: z
+        .string()
+        .optional()
+        .describe("Your own Wisewand API key (implies wisewand=true, reduces cost to 1 credit/page)"),
     },
-    async ({ page_ids }) => {
-      const res = await client.rewriteBulk(page_ids);
+    async ({ page_ids, wisewand, wisewand_api_key }) => {
+      const useWisewand = wisewand || !!wisewand_api_key;
+      const res = await client.rewriteBulk(page_ids, useWisewand ? 'wisewand' : undefined, wisewand_api_key);
       return {
         content: [
           {
