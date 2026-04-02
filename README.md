@@ -67,9 +67,8 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 - **enrich_project** — Enrich with Haloscan (free) and/or Majestic (10 credits)
 
 ### Rewriting
-- **rewrite_page** — Rewrite with GPT (1 credit), optional custom instructions
-- **rewrite_wisewand** — Rewrite with Wisewand premium (10 credits, takes 2-4h)
-- **rewrite_bulk** — Rewrite multiple pages with GPT (1 credit each, max 50)
+- **rewrite_page** — Rewrite a page (GPT default 1 credit, add `wisewand=true` for premium 10 credits / 1 with own key)
+- **rewrite_bulk** — Rewrite multiple pages (same options, max 50)
 
 ### Image Generation
 - **generate_image** — Generate AI featured image (1 credit)
@@ -112,8 +111,8 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 | Haloscan enrichment | Free |
 | Majestic enrichment (backlinks) | 10 credits |
 | Scrape a page | 1 credit |
-| GPT rewrite | 1 credit |
-| Wisewand rewrite | 10 credits (1 with your own key) |
+| Rewrite (GPT) | 1 credit |
+| Rewrite (Wisewand) | 10 credits (1 with own key) |
 | Image generation | 1 credit |
 | AI categorization | Free |
 | WordPress publish | Free |
