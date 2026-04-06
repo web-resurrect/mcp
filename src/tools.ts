@@ -131,6 +131,33 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
     }
   );
 
+  server.tool(
+    "update_page",
+    "Update a page's WordPress category and/or author assignment. Use this to manually set or change the category after categorization, or to override the author for specific pages. Set to null to clear.",
+    {
+      page_id: z.string().uuid().describe("Page UUID"),
+      category_id: z
+        .number()
+        .int()
+        .nullable()
+        .optional()
+        .describe("WordPress category ID to assign (null to clear)"),
+      author_id: z
+        .number()
+        .int()
+        .nullable()
+        .optional()
+        .describe("WordPress author ID to assign (null to clear)"),
+    },
+    async ({ page_id, category_id, author_id }) => {
+      const updates: Record<string, unknown> = {};
+      if (category_id !== undefined) updates.category_id = category_id;
+      if (author_id !== undefined) updates.author_id = author_id;
+      const res = await client.updatePage(page_id, updates as { category_id?: number | null; author_id?: number | null });
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+    }
+  );
+
   // ── Scraping ─────────────────────────────────────────────────────────
 
   server.tool(

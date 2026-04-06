@@ -228,6 +228,10 @@ export class WebResurrectClient {
     return this.request("GET", `/api/v1/pages/${id}`);
   }
 
+  async updatePage(id: string, updates: { category_id?: number | null; author_id?: number | null }): Promise<ApiResponse> {
+    return this.request("PATCH", `/api/v1/pages/${id}`, updates);
+  }
+
   async getPageContent(id: string): Promise<ApiResponse> {
     return this.request("GET", `/api/v1/pages/${id}/content`);
   }
