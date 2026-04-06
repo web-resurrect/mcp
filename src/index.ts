@@ -49,13 +49,21 @@ WORKFLOW — from expired domain to live WordPress site:
 
 6. GENERATE FEATURED IMAGES: generate_image for each rewritten page (1 credit/page). ALWAYS generate images — pages without a featured image look incomplete on WordPress.
 
-7. CONNECT WORDPRESS: Before publishing, verify the WordPress connection with wordpress_check. The site needs either the Resurect plugin (X-Resurect-Key auth) or an application password configured. This connection is required to fetch categories and authors.
+7. CONNECT WORDPRESS: Before publishing, verify the WordPress connection with wordpress_plugin_check. The site needs either the Resurect plugin (X-Resurect-Key auth) or an application password configured. This connection is required to fetch categories and authors.
 
-8. CATEGORIZE ARTICLES: categorize_page to suggest a WordPress category based on page content (free). Use wordpress_categories to list available categories.
+8. CONFIGURE CATEGORY-AUTHOR MAPPING: BEFORE categorizing pages, you MUST set up the mapping:
+   a. wordpress_categories — list all WordPress categories
+   b. wordpress_authors — list all WordPress authors
+   c. wordpress_set_mapping — map each category to its author (e.g. "Mode" → "Élise", "Bijoux" → "Aurelie")
+   This mapping is used at publish time to automatically assign the correct author based on the page's category.
 
-9. PUBLISH TO WORDPRESS: wordpress_publish with the page_id, domain, and author_id. Use wordpress_authors to list available authors.
+9. CATEGORIZE ARTICLES: categorize_pages to AI-suggest a WordPress category for each page (free, 1-50 pages per batch). The category is saved to the page in the database.
 
-IMPORTANT: Every page should go through the full pipeline: scrape → rewrite → image → categorize → publish. Skipping steps produces lower quality results.`,
+10. PUBLISH TO WORDPRESS: wordpress_publish or wordpress_publish_bulk. The author is automatically resolved from the category-author mapping — no need to pass author_id manually. In plugin mode, original URLs are preserved.
+
+11. PUSH REDIRECTS: push_redirects to send all URL mappings to the WordPress plugin. Published pages are served at their original URLs, non-published pages redirect to the homepage.
+
+IMPORTANT: Every page should go through the full pipeline: scrape → rewrite → image → categorize → publish. Skipping steps produces lower quality results. The category-author mapping MUST be configured before categorizing.`,
 });
 
 const client = new WebResurrectClient(API_KEY, BASE_URL);

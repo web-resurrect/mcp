@@ -341,6 +341,18 @@ export class WebResurrectClient {
     return this.request("POST", "/api/v1/wordpress/credentials/validate", { domain });
   }
 
+  async wordpressGetMapping(domain: string): Promise<ApiResponse> {
+    return this.request("GET", `/api/v1/wordpress/mapping/${encodeURIComponent(domain)}`);
+  }
+
+  async wordpressSetMapping(domain: string, mappings: Array<{ category_id: number; author_id: number }>, defaultAuthorId?: number, defaultCategoryId?: number): Promise<ApiResponse> {
+    return this.request("PUT", `/api/v1/wordpress/mapping/${encodeURIComponent(domain)}`, {
+      mappings,
+      default_author_id: defaultAuthorId,
+      default_category_id: defaultCategoryId,
+    });
+  }
+
   async wordpressCategories(domain: string): Promise<ApiResponse<WordPressCategory[]>> {
     return this.request("GET", `/api/v1/wordpress/categories/${encodeURIComponent(domain)}`);
   }

@@ -405,7 +405,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "categorize_pages",
-    "AI-suggest WordPress categories for 1–50 pages based on their content. Free. Requires a configured WordPress domain.",
+    "AI-suggest WordPress categories for 1–50 pages based on their content. Free. Saves the assigned category to each page in the database. PREREQUISITE: Configure the category-to-author mapping with wordpress_set_mapping BEFORE categorizing, so that authors are auto-resolved when publishing.",
     {
       page_ids: z.array(z.string().uuid()).min(1).max(50).describe("Page UUIDs (1 to 50)"),
       wordpress_domain: z.string().describe("WordPress domain (e.g. example.com)"),
@@ -470,6 +470,55 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
     async ({ domain }) => {
       const res = await client.wordpressValidate(domain);
       return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "wordpress_get_mapping",
+    "Get the current category-to-author mapping for a WordPress domain. This mapping determines which author is automatically assigned when publishing a page with a given category.",
+    {
+      domain: z.string().describe("WordPress domain (e.g. example.com)"),
+    },
+    async ({ domain }) => {
+      const res = await client.wordpressGetMapping(domain);
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "wordpress_set_mapping",
+    `Configure the category-to-author mapping for a WordPress domain. IMPORTANT: This must be done BEFORE categorizing or publishing pages.
+
+The mapping tells the system which author to assign for each category when publishing. Example: if category "Mode" (ID 5) should be authored by "Élise" (ID 3), set mappings: [{ category_id: 5, author_id: 3 }].
+
+Workflow:
+1. wordpress_categories — list available categories
+2. wordpress_authors — list available authors
+3. wordpress_set_mapping — configure which author writes for which category
+4. categorize_pages — AI-categorize pages (saves category to each page)
+5. wordpress_publish or wordpress_publish_bulk — author is auto-resolved from mapping`,
+    {
+      domain: z.string().describe("WordPress domain (e.g. example.com)"),
+      mappings: z
+        .array(z.object({
+          category_id: z.number().int().describe("WordPress category ID"),
+          author_id: z.number().int().describe("WordPress author ID"),
+        }))
+        .describe("Array of category-to-author mappings"),
+      default_author_id: z
+        .number()
+        .int()
+        .optional()
+        .describe("Default author ID when no mapping matches"),
+      default_category_id: z
+        .number()
+        .int()
+        .optional()
+        .describe("Default category ID when page has no category assigned"),
+    },
+    async ({ domain, mappings, default_author_id, default_category_id }) => {
+      const res = await client.wordpressSetMapping(domain, mappings, default_author_id, default_category_id);
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
     }
   );
 
