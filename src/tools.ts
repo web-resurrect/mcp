@@ -405,7 +405,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "categorize_pages",
-    "AI-suggest WordPress categories for 1–50 pages based on their content. Free. Saves the assigned category to each page in the database. PREREQUISITE: Configure the category-to-author mapping with wordpress_set_mapping BEFORE categorizing, so that authors are auto-resolved when publishing.",
+    "AI-suggest WordPress categories for 1–50 pages based on their content. Free. Saves the assigned category to each page in the database. PREREQUISITE: Configure the category-to-author mapping with wordpress_set_mapping BEFORE categorizing. To categorize a full project: use list_pages with status='scraped' or status='rewritten' to get page IDs, then call this tool in batches of 50.",
     {
       page_ids: z.array(z.string().uuid()).min(1).max(50).describe("Page UUIDs (1 to 50)"),
       wordpress_domain: z.string().describe("WordPress domain (e.g. example.com)"),
