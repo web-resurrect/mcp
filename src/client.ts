@@ -98,13 +98,19 @@ export interface EnrichResponse {
 }
 
 export interface CategorizeResponse {
-  page_id: string;
-  suggested_category: {
-    id: number;
-    name: string;
-    slug: string;
-    confidence: number;
-  } | null;
+  wordpress_domain: string;
+  total: number;
+  categorized: number;
+  suggestions: Array<{
+    page_id: string;
+    suggested_category: {
+      id: number;
+      name: string;
+      slug: string;
+      confidence: number;
+    } | null;
+    message?: string;
+  }>;
 }
 
 export interface PluginCheckResponse {
@@ -207,6 +213,7 @@ export class WebResurrectClient {
     projectId: string,
     opts?: {
       status?: string;
+      has_data?: string;
       search?: string;
       sort?: string;
       order?: string;
@@ -300,12 +307,12 @@ export class WebResurrectClient {
 
   // ── Categorization ───────────────────────────────────────────────────
 
-  async categorizePage(
-    pageId: string,
+  async categorizePages(
+    pageIds: string[],
     wordpressDomain: string
   ): Promise<ApiResponse<CategorizeResponse>> {
-    return this.request("POST", "/api/v1/categorize", {
-      page_id: pageId,
+    return this.request("POST", "/api/v1/categorize/bulk", {
+      page_ids: pageIds,
       wordpress_domain: wordpressDomain,
     });
   }
@@ -381,5 +388,16 @@ export class WebResurrectClient {
 
   async cancelJob(id: string): Promise<ApiResponse> {
     return this.request("POST", `/api/v1/jobs/${id}/cancel`);
+  }
+
+  async exportRedirects(projectId: string, format: string): Promise<ApiResponse> {
+    return this.request("GET", `/api/v1/projects/${projectId}/redirects`, undefined, { format });
+  }
+
+  async pushRedirects(projectId: string, wordpressDomain: string, urls?: string[], redirectTo?: string): Promise<ApiResponse> {
+    const body: Record<string, unknown> = { wordpress_domain: wordpressDomain };
+    if (urls && urls.length > 0) body.urls = urls;
+    if (redirectTo) body.redirect_to = redirectTo;
+    return this.request("POST", `/api/v1/projects/${projectId}/redirects/push`, body);
   }
 }

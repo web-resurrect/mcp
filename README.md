@@ -67,7 +67,7 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 - **enrich_project** — Enrich with Haloscan (free) and/or Majestic (10 credits)
 
 ### Rewriting
-- **rewrite_page** — Rewrite a page (GPT default 1 credit, add `wisewand=true` for premium 10 credits / 1 with own key)
+- **rewrite_page** — Rewrite a page (basic default 1 credit, add `wisewand=true` for premium 10 credits / 1 with own key)
 - **rewrite_bulk** — Rewrite multiple pages (same options, max 50)
 
 ### Image Generation
@@ -83,8 +83,9 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 - **wordpress_validate** — Validate WordPress connection
 - **wordpress_categories** — List WordPress categories
 - **wordpress_authors** — List WordPress authors
-- **wordpress_publish** — Publish a page to WordPress (free)
-- **wordpress_publish_bulk** — Publish multiple pages (free)
+- **wordpress_publish** — Publish a page to WordPress (free, original URLs preserved in plugin mode)
+- **wordpress_publish_bulk** — Publish multiple pages (free, supports plugin and Basic Auth modes)
+- **export_redirects** — Export URL mappings to file (only needed for Basic Auth mode)
 
 ### Jobs
 - **get_job** — Get job status, progress, and result
@@ -101,7 +102,8 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 6. `rewrite_bulk` the scraped pages
 7. `generate_image_bulk` for rewritten pages
 8. `wordpress_configure` your WordPress site
-9. `wordpress_publish_bulk` to publish everything
+9. `wordpress_publish_bulk` to publish everything (original URLs preserved in plugin mode, URL mappings pushed automatically)
+10. Non-published URLs automatically 301 to homepage (via plugin catch-all)
 
 ## Credit costs
 
@@ -111,7 +113,7 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 | Haloscan enrichment | Free |
 | Majestic enrichment (backlinks) | 10 credits |
 | Scrape a page | 1 credit |
-| Rewrite (GPT) | 1 credit |
+| Rewrite (basic) | 1 credit |
 | Rewrite (Wisewand) | 10 credits (1 with own key) |
 | Image generation | 1 credit |
 | AI categorization | Free |

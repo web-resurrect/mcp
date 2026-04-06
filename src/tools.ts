@@ -90,9 +90,13 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
     {
       project_id: z.string().uuid().describe("Project UUID"),
       status: z
-        .enum(["pending", "scraped", "rewritten", "published"])
+        .enum(["pending", "scraped", "empty", "failed", "rewritten", "published"])
         .optional()
-        .describe("Filter by page status"),
+        .describe("Filter by page status. 'empty' = scraped but no content on Wayback Machine. 'failed' = scrape error."),
+      has_data: z
+        .enum(["haloscan", "majestic", "any"])
+        .optional()
+        .describe("Only pages with SEO data: haloscan (traffic>0), majestic (backlinks>0), any (either)"),
       search: z.string().optional().describe("Search by URL or title"),
       sort: z
         .enum(["created_at", "total_traffic", "backlinks_count", "url", "title"])
@@ -102,8 +106,8 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
       page: z.number().int().positive().optional().describe("Page number (default 1)"),
       limit: z.number().int().min(1).max(100).optional().describe("Items per page (default 50, max 100)"),
     },
-    async ({ project_id, status, search, sort, order, page, limit }) => {
-      const res = await client.listPages(project_id, { status, search, sort, order, page, limit });
+    async ({ project_id, status, has_data, search, sort, order, page, limit }) => {
+      const res = await client.listPages(project_id, { status, has_data, search, sort, order, page, limit });
       return {
         content: [
           {
@@ -156,20 +160,48 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "scrape_bulk",
-    "Scrape multiple pages at once. Costs 1 credit per page. Max 100 pages. Returns a job_id. IMPORTANT: Scraping is the mandatory first step — pages must be scraped before rewriting or generating images.",
+    "Scrape multiple pages at once. Costs 1 credit per page. Max 100 pages. Returns a job_id. IMPORTANT: Scraping is the mandatory first step — pages must be scraped before rewriting or generating images. You can either pass page_ids directly, or pass project_id to auto-select pending pages (optionally filtered by has_data).",
     {
       page_ids: z
         .array(z.string().uuid())
         .min(1)
         .max(100)
-        .describe("Array of page UUIDs to scrape"),
+        .describe("Array of page UUIDs to scrape")
+        .optional(),
+      project_id: z
+        .string()
+        .uuid()
+        .optional()
+        .describe("Project UUID — auto-selects pending pages (use instead of page_ids)"),
+      has_data: z
+        .enum(["haloscan", "majestic", "any"])
+        .optional()
+        .describe("Only scrape pages with SEO data. Requires project_id. haloscan=traffic>0, majestic=backlinks>0, any=either"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe("Max pages to scrape when using project_id (default 50)"),
       content_type: z
         .enum(["article", "product", "productList", "jina"])
         .optional()
         .describe("Content extraction type (default: article)"),
     },
-    async ({ page_ids, content_type }) => {
-      const res = await client.scrapeBulk(page_ids, content_type);
+    async ({ page_ids, project_id, has_data, limit, content_type }) => {
+      let ids = page_ids;
+      if (!ids) {
+        if (!project_id) {
+          return { content: [{ type: "text" as const, text: "Error: provide either page_ids or project_id." }] };
+        }
+        const pages = await client.listPages(project_id, { status: "pending", has_data, limit: limit ?? 50 });
+        ids = (pages.data ?? []).map((p: { id: string }) => p.id);
+        if (ids.length === 0) {
+          return { content: [{ type: "text" as const, text: "No matching pending pages found" + (has_data ? ` with ${has_data} data` : "") + "." }] };
+        }
+      }
+      const res = await client.scrapeBulk(ids, content_type);
       return {
         content: [
           {
@@ -214,14 +246,14 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "rewrite_page",
-    "Rewrite a scraped page. By default uses GPT (basic, 1 credit). Add wisewand=true for premium SEO-optimized content with proper headings, meta tags, and unique structure (10 credits, or 1 credit with your own Wisewand API key). The page must be scraped first. Returns a job_id.",
+    "Rewrite a scraped page. By default uses basic rewriting (1 credit). Add wisewand=true for premium SEO-optimized content with proper headings, meta tags, and unique structure (10 credits, or 1 credit with your own Wisewand API key). The page must be scraped first. Returns a job_id.",
     {
       page_id: z.string().uuid().describe("Page UUID (must be scraped first)"),
       wisewand: z.boolean().optional().describe("Use Wisewand for premium SEO-optimized rewrite (10 credits, 1 with own key)"),
       instructions: z
         .string()
         .optional()
-        .describe("Custom rewrite instructions (basic GPT mode only)"),
+        .describe("Custom rewrite instructions (basic mode only)"),
       subject: z.string().optional().describe("Custom subject (Wisewand mode only)"),
       article_params: z
         .record(z.string(), z.unknown())
@@ -265,7 +297,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "rewrite_bulk",
-    "Rewrite multiple scraped pages. By default uses GPT (1 credit/page). Add wisewand=true for premium quality (10 credits/page, 1 with own key). Max 50 pages. Returns a job_id.",
+    "Rewrite multiple scraped pages. By default uses basic rewriting (1 credit/page). Add wisewand=true for premium quality (10 credits/page, 1 with own key). Max 50 pages. Returns a job_id.",
     {
       page_ids: z
         .array(z.string().uuid())
@@ -345,14 +377,14 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
   // ── Categorization ───────────────────────────────────────────────────
 
   server.tool(
-    "categorize_page",
-    "AI-suggest a WordPress category for a page based on its content. Free. Requires a configured WordPress domain.",
+    "categorize_pages",
+    "AI-suggest WordPress categories for 1–50 pages based on their content. Free. Requires a configured WordPress domain.",
     {
-      page_id: z.string().uuid().describe("Page UUID"),
+      page_ids: z.array(z.string().uuid()).min(1).max(50).describe("Page UUIDs (1 to 50)"),
       wordpress_domain: z.string().describe("WordPress domain (e.g. example.com)"),
     },
-    async ({ page_id, wordpress_domain }) => {
-      const res = await client.categorizePage(page_id, wordpress_domain);
+    async ({ page_ids, wordpress_domain }) => {
+      const res = await client.categorizePages(page_ids, wordpress_domain);
       return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
     }
   );
@@ -440,7 +472,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "wordpress_publish",
-    "Publish a page to WordPress. Async operation, returns a job_id. Free (no credit cost).",
+    "Publish a page to WordPress. Async operation, returns a job_id. Free (no credit cost). When using the Web Resurrect plugin, the original URL is preserved (e.g. /chaussures/basket-rouge.html serves the post directly at that URL, no redirect). URL mappings are pushed automatically.",
     {
       page_id: z.string().uuid().describe("Page UUID to publish"),
       wordpress_domain: z.string().describe("Target WordPress domain"),
@@ -470,7 +502,7 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
 
   server.tool(
     "wordpress_publish_bulk",
-    "Publish multiple pages to WordPress at once. Returns a job_id. Free.",
+    "Publish multiple pages to WordPress at once. Returns a job_id. Free. Supports both plugin mode and Basic Auth mode. In plugin mode, original URLs are preserved and URL mappings are pushed automatically.",
     {
       page_ids: z
         .array(z.string().uuid())
@@ -495,6 +527,87 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
             type: "text",
             text: JSON.stringify(res.data, null, 2) +
               "\n\nBulk publishing started. Use get_job with the job_id to track progress.",
+          },
+        ],
+      };
+    }
+  );
+
+  // ── Redirects ──────────────────────────────────────────────────────────
+
+  server.tool(
+    "export_redirects",
+    "Export URL mappings (old URLs → new WordPress URLs) for all published pages. In plugin mode, URL mappings are pushed automatically during publish (posts are served at original URLs). This tool is only needed for Basic Auth mode to generate import files for the Redirection plugin (John Godley) or Rank Math. IMPORTANT: Save the output to a file on the user's computer.",
+    {
+      project_id: z.string().uuid().describe("Project UUID"),
+      format: z
+        .enum(["redirection", "rankmath"])
+        .optional()
+        .describe("Export format: 'redirection' (John Godley plugin JSON, default) or 'rankmath' (Rank Math import format)"),
+    },
+    async ({ project_id, format }) => {
+      const res = await client.exportRedirects(project_id, format || "redirection");
+      const data = res.data as Record<string, unknown>;
+      const fmt = format || "redirection";
+
+      // For Redirection plugin: return just the importable JSON
+      let importContent: string;
+      if (fmt === "redirection") {
+        importContent = JSON.stringify(
+          { redirects: data.redirects, groups: data.groups },
+          null,
+          2
+        );
+      } else {
+        importContent = JSON.stringify(data.redirects, null, 2);
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `${data.count} redirects generated (${fmt} format).\n\n` +
+              `SAVE THIS TO A FILE on the user's computer (e.g. redirects-${fmt}.json):\n\n` +
+              importContent +
+              `\n\nIMPORT INSTRUCTIONS:\n` +
+              (fmt === "redirection"
+                ? "WordPress → Redirection plugin → Tools → Import → upload the JSON file"
+                : "WordPress → Rank Math → Redirections → Import/Export → Import the JSON file"),
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "push_redirects",
+    `Push URL redirects to the WordPress plugin. Requires the Web Resurrect plugin (not Basic Auth). Two modes:
+
+1. WITHOUT urls parameter: pushes ALL project pages at once. Published pages are served at their original URLs. Non-published pages get a 301 redirect (to homepage by default, or to redirect_to if specified). WARNING: This replaces all existing redirects in the plugin. Make sure pages like /contact, /mentions-legales, /politique-de-confidentialite etc. are excluded from the project or already published before running this, otherwise they will be redirected to the homepage too.
+
+2. WITH urls parameter: only redirects the specified URLs (added individually, does NOT replace existing redirects). Useful to selectively redirect specific old URLs.
+
+Call this after publishing to ensure all old URLs are properly handled.`,
+    {
+      project_id: z.string().uuid().describe("Project UUID"),
+      wordpress_domain: z.string().describe("Target WordPress domain"),
+      urls: z
+        .array(z.string())
+        .optional()
+        .describe("Specific URLs or paths to redirect (e.g. [\"/old-page.html\", \"/category/sub/\"]). If omitted, all non-published pages are redirected."),
+      redirect_to: z
+        .string()
+        .optional()
+        .describe("Custom redirect target URL (default: homepage). Example: \"https://example.com/new-landing/\""),
+    },
+    async ({ project_id, wordpress_domain, urls, redirect_to }) => {
+      const res = await client.pushRedirects(project_id, wordpress_domain, urls, redirect_to);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(res.data, null, 2),
           },
         ],
       };
