@@ -142,6 +142,11 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
         .nullable()
         .optional()
         .describe("WordPress category ID to assign (null to clear)"),
+      category_name: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("WordPress category name (set alongside category_id)"),
       author_id: z
         .number()
         .int()
@@ -149,9 +154,10 @@ export function registerTools(server: McpServer, client: WebResurrectClient): vo
         .optional()
         .describe("WordPress author ID to assign (null to clear)"),
     },
-    async ({ page_id, category_id, author_id }) => {
+    async ({ page_id, category_id, category_name, author_id }) => {
       const updates: Record<string, unknown> = {};
       if (category_id !== undefined) updates.category_id = category_id;
+      if (category_name !== undefined) updates.category_name = category_name;
       if (author_id !== undefined) updates.author_id = author_id;
       const res = await client.updatePage(page_id, updates as { category_id?: number | null; author_id?: number | null });
       return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
