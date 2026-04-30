@@ -49,6 +49,8 @@ export interface PageData {
   url: string;
   archive_url: string;
   title: string | null;
+  source?: string;
+  top_keywords?: string | null;
   status: string;
   is_scraped: boolean;
   is_rewritten: boolean;
@@ -213,22 +215,39 @@ export class WebResurrectClient {
     projectId: string,
     opts?: {
       status?: string;
+      source?: string;
       has_data?: string;
       search?: string;
       sort?: string;
       order?: string;
       page?: number;
       limit?: number;
+      exclude_system?: boolean;
     }
   ): Promise<PaginatedResponse<PageData>> {
-    return this.request("GET", `/api/v1/projects/${projectId}/pages`, undefined, opts as Record<string, string | number | undefined>);
+    const query: Record<string, string | number | undefined> = { ...(opts as Record<string, string | number | undefined>) };
+    if (opts?.exclude_system) {
+      query.exclude_system = "true";
+    } else {
+      delete query.exclude_system;
+    }
+    return this.request("GET", `/api/v1/projects/${projectId}/pages`, undefined, query);
   }
 
   async getPage(id: string): Promise<ApiResponse<PageData>> {
     return this.request("GET", `/api/v1/pages/${id}`);
   }
 
-  async updatePage(id: string, updates: { category_id?: number | null; category_name?: string | null; author_id?: number | null }): Promise<ApiResponse> {
+  async updatePage(
+    id: string,
+    updates: {
+      category_id?: number | null;
+      category_name?: string | null;
+      author_id?: number | null;
+      wordpress_post_id?: number | null;
+      wordpress_post_url?: string | null;
+    }
+  ): Promise<ApiResponse> {
     return this.request("PATCH", `/api/v1/pages/${id}`, updates);
   }
 
@@ -236,7 +255,15 @@ export class WebResurrectClient {
     return this.request("GET", `/api/v1/pages/${id}/content`);
   }
 
-  async getPageRewritten(id: string): Promise<ApiResponse> {
+  async getPageRewritten(id: string): Promise<ApiResponse<{
+    id: string;
+    page_id: string;
+    source: string;
+    title: string | null;
+    content: string | null;
+    meta: { title?: string | null; description?: string | null } | null;
+    created_at: string;
+  }>> {
     return this.request("GET", `/api/v1/pages/${id}/rewritten`);
   }
 
@@ -291,11 +318,23 @@ export class WebResurrectClient {
     });
   }
 
-  async rewriteBulk(pageIds: string[], engine?: string, wisewandApiKey?: string): Promise<ApiResponse<AsyncJobResponse>> {
+  async rewriteBulk(
+    pageIds: string[],
+    engine?: string,
+    wisewandApiKey?: string,
+    articleParams?: Record<string, unknown>
+  ): Promise<ApiResponse<AsyncJobResponse>> {
+    // Route to the Wisewand bulk endpoint when engine === 'wisewand'; the basic
+    // /rewrite/bulk endpoint does not understand the `engine` body param.
+    if (engine === 'wisewand') {
+      return this.request("POST", "/api/v1/rewrite/wisewand/bulk", {
+        page_ids: pageIds,
+        ...(wisewandApiKey ? { wisewand_api_key: wisewandApiKey } : {}),
+        ...(articleParams ? { article_params: articleParams } : {}),
+      });
+    }
     return this.request("POST", "/api/v1/rewrite/bulk", {
       page_ids: pageIds,
-      ...(engine ? { engine } : {}),
-      ...(wisewandApiKey ? { wisewand_api_key: wisewandApiKey } : {}),
     });
   }
 
@@ -354,11 +393,21 @@ export class WebResurrectClient {
   }
 
   async wordpressCategories(domain: string): Promise<ApiResponse<WordPressCategory[]>> {
-    return this.request("GET", `/api/v1/wordpress/categories/${encodeURIComponent(domain)}`);
+    // API returns { domain, mode, categories: [...] } — unwrap so callers get a clean array.
+    const raw = await this.request<ApiResponse<{ domain: string; mode: string; categories: WordPressCategory[] }>>(
+      "GET",
+      `/api/v1/wordpress/categories/${encodeURIComponent(domain)}`
+    );
+    return { ...raw, data: raw.data?.categories ?? [] };
   }
 
   async wordpressAuthors(domain: string): Promise<ApiResponse<WordPressAuthor[]>> {
-    return this.request("GET", `/api/v1/wordpress/authors/${encodeURIComponent(domain)}`);
+    // API returns { domain, mode, authors: [...] } — unwrap.
+    const raw = await this.request<ApiResponse<{ domain: string; mode: string; authors: WordPressAuthor[] }>>(
+      "GET",
+      `/api/v1/wordpress/authors/${encodeURIComponent(domain)}`
+    );
+    return { ...raw, data: raw.data?.authors ?? [] };
   }
 
   async wordpressPublish(opts: {
@@ -393,6 +442,32 @@ export class WebResurrectClient {
     return this.request("GET", `/api/v1/jobs/${id}`);
   }
 
+  async waitForJob(
+    id: string,
+    opts?: { timeoutSeconds?: number; pollIntervalSeconds?: number }
+  ): Promise<ApiResponse<JobData> & { timed_out?: boolean }> {
+    const timeoutMs = (opts?.timeoutSeconds ?? 300) * 1000;
+    const pollMs = Math.max(1, opts?.pollIntervalSeconds ?? 5) * 1000;
+    const deadline = Date.now() + timeoutMs;
+
+    let last: ApiResponse<JobData> = await this.getJob(id);
+    while (true) {
+      const status = last.data?.status;
+      if (status === "completed" || status === "failed" || status === "cancelled") {
+        return last;
+      }
+      if (Date.now() + pollMs > deadline) {
+        return { ...last, timed_out: true };
+      }
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+      last = await this.getJob(id);
+    }
+  }
+
+  async getProjectStats(id: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request("GET", `/api/v1/projects/${id}/stats`);
+  }
+
   async listJobs(opts?: {
     status?: string;
     type?: string;
@@ -416,4 +491,5 @@ export class WebResurrectClient {
     if (redirectTo) body.redirect_to = redirectTo;
     return this.request("POST", `/api/v1/projects/${projectId}/redirects/push`, body);
   }
+
 }

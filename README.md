@@ -1,6 +1,31 @@
 # @web-resurrect/mcp
 
+[![npm version](https://img.shields.io/npm/v/@web-resurrect/mcp.svg)](https://www.npmjs.com/package/@web-resurrect/mcp)
+[![AI Skill](https://img.shields.io/badge/AI%20Skill-web--resurrect-blueviolet)](https://github.com/MattiooFR/web-resurrect-skill)
+
 MCP (Model Context Protocol) server for the [Web Resurrect](https://web-resurrect.com) API. Lets AI assistants like Claude resurrect expired domains: fetch archived URLs, scrape content, rewrite with AI, generate images, and publish to WordPress.
+
+## 🤖 AI Agent Skill (pipeline complet)
+
+Le **skill unifié `web-resurrect`** couvre tout le workflow de A à Z (création projet → enrichissement SEO → scraping Wayback → réécriture → catégorisation AI → publication WordPress → redirections), avec toutes les astuces et pièges connus. Il fonctionne aussi bien avec ce MCP server qu'avec la CLI `wr`, et contient une table de correspondance complète entre les deux modes.
+
+Compatible avec **Claude Code, Codex, Cursor, Cline, Copilot, OpenCode, Windsurf** et 40+ autres agents via [`npx skills`](https://github.com/vercel-labs/skills) :
+
+```bash
+# Install globalement pour tous tes projets
+npx skills add MattiooFR/web-resurrect-skill -g
+
+# Ou uniquement pour le projet courant
+npx skills add MattiooFR/web-resurrect-skill
+```
+
+Une fois installé, demande simplement à ton agent :
+
+> "Ressuscite le domaine exemple.com"
+
+Et il suivra automatiquement le pipeline complet en utilisant les outils MCP `mcp__web_resurrect__*` de ce serveur.
+
+**Source du skill** : [github.com/MattiooFR/web-resurrect-skill](https://github.com/MattiooFR/web-resurrect-skill)
 
 ## Quick start
 
@@ -56,7 +81,7 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 - **delete_project** — Delete a project and all its pages
 
 ### Pages
-- **list_pages** — List pages with status/search filters, sorting, pagination
+- **list_pages** — List pages with status/source/search filters, sorting, pagination. Each page exposes a `source` field: `wayback` (default, scrapeable from archive) or `haloscan` (discovered via Haloscan, no snapshot — Wisewand-rewrite only).
 - **get_page** — Get full page details (scrape, rewrite, SEO, WordPress status)
 
 ### Scraping
@@ -67,8 +92,8 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 - **enrich_project** — Enrich with Haloscan (free) and/or Majestic (10 credits)
 
 ### Rewriting
-- **rewrite_page** — Rewrite a page (basic default 1 credit, add `wisewand=true` for premium 10 credits / 1 with own key)
-- **rewrite_bulk** — Rewrite multiple pages (same options, max 50)
+- **rewrite_page** — Rewrite a page (basic default 1 credit, add `wisewand=true` for premium 5 credits / 1 with own key). Wisewand mode also accepts Haloscan-origin pages (no scrape required).
+- **rewrite_bulk** — Rewrite multiple pages (same options, max 50). In Wisewand mode, mixes scraped + Haloscan-origin pages; use `list_pages` with `status='rewritable_wisewand'` to fetch everything rewritable in one call, or `status='haloscan'` to target only Haloscan-origin pages.
 
 ### Image Generation
 - **generate_image** — Generate AI featured image (1 credit)
@@ -89,8 +114,12 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 
 ### Jobs
 - **get_job** — Get job status, progress, and result
+- **wait_for_job** — Block until a job reaches a terminal state (server-side polling). USE THIS AFTER EVERY ASYNC CALL for autonomous pipelines — no more manual polling loops.
 - **list_jobs** — List recent jobs with filters
 - **cancel_job** — Cancel a pending job
+
+### Overview
+- **get_project_overview** — Single-call pipeline status: pending/scraped/rewritten/published counts, Wisewand pipeline state, SEO totals. Replaces several list_pages calls.
 
 ## Typical workflow
 
@@ -114,7 +143,7 @@ WEB_RESURRECT_API_KEY=wr_live_xxx node dist/index.js
 | Majestic enrichment (backlinks) | 10 credits |
 | Scrape a page | 1 credit |
 | Rewrite (basic) | 1 credit |
-| Rewrite (Wisewand) | 10 credits (1 with own key) |
+| Rewrite (Wisewand) | 5 credits (1 with own key) |
 | Image generation | 1 credit |
 | AI categorization | Free |
 | WordPress publish | Free |
