@@ -1,0 +1,49 @@
+{
+  "manifest_version": "0.2",
+  "name": "web-resurrect",
+  "display_name": "Web Resurrect",
+  "version": "1.3.2",
+  "description": "Resurrect expired domains: scrape Wayback, AI-rewrite, generate images, publish to WordPress.",
+  "long_description": "Pipeline complet pour faire revivre un domaine expiré : enrichissement SEO (Haloscan + Majestic), scraping de la Wayback Machine, réécriture AI, génération d'images, catégorisation, publication WordPress et redirections. Voir https://web-resurrect.com.",
+  "author": {
+    "name": "Mathieu Dugue",
+    "url": "https://web-resurrect.com"
+  },
+  "homepage": "https://web-resurrect.com",
+  "documentation": "https://github.com/web-resurrect/mcp#readme",
+  "support": "https://github.com/web-resurrect/mcp/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "WEB_RESURRECT_API_KEY": "${user_config.api_key}",
+        "WEB_RESURRECT_BASE_URL": "${user_config.base_url}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Web Resurrect API Key",
+      "description": "Your API key (wr_live_xxx). Get one at https://web-resurrect.com/dashboard.",
+      "sensitive": true,
+      "required": true
+    },
+    "base_url": {
+      "type": "string",
+      "title": "API Base URL",
+      "description": "Override only for self-hosted or staging.",
+      "default": "https://web-resurrect.com",
+      "required": false
+    }
+  },
+  "keywords": ["seo", "wordpress", "expired-domains", "wayback", "ai-rewrite"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-resurrect/mcp"
+  }
+}
