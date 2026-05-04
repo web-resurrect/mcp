@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "web-resurrect",
   "display_name": "Web Resurrect",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Resurrect expired domains: scrape Wayback, AI-rewrite, generate images, publish to WordPress.",
   "long_description": "Pipeline complet pour faire revivre un domaine expiré : enrichissement SEO (Haloscan + Majestic), scraping de la Wayback Machine, réécriture AI, génération d'images, catégorisation, publication WordPress et redirections. Voir https://web-resurrect.com.",
   "author": {

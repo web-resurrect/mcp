@@ -1,6 +1,6 @@
 {
   "name": "@web-resurrect/mcp",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "mcpName": "io.github.web-resurrect/mcp",
   "description": "MCP server for the Web Resurrect API — resurrect expired domains via AI assistants",
   "type": "module",
